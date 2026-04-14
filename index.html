@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Binance Pro - Expert Edition</title>
+    
+    <!-- টেলিগ্রাম মিনি অ্যাপের জন্য এই স্ক্রিপ্টটি মাস্ট -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <style>
+        :root { 
+            --up: #02c076; --down: #f84960; --bg: #0b0e11; 
+            --card-bg: #1e2329; --text-main: #eaecef; --text-muted: #848e9c; 
+            --yellow: #fcd535; --input-bg: #2b3139;
+            --grid-line: rgba(255, 255, 255, 0.02);
+        }
+        body { background: var(--bg); color: var(--text-main); font-family: 'Segoe UI', sans-serif; margin: 0; overflow-y: auto; display: flex; justify-content: center; touch-action: manipulation; }
+        .binance-container { width: 100%; max-width: 450px; background: var(--bg); min-height: 100vh; padding-bottom: 120px; border-left: 1px solid #2b3139; border-right: 1px solid #2b3139; }
+        
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #2b3139; background: var(--bg); position: sticky; top: 0; z-index: 100; }
+        
+        .wallet-overview { background: #161a1e; padding: 15px; border-bottom: 3px solid #000; }
+        .equity-val { font-size: 22px; font-weight: bold; color: #fff; }
+        
+        .btn-sm { padding: 6px 12px; border-radius: 4px; border: none; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .ad-btn-gold { background: var(--yellow); color: #000; }
+        .action-btn-grey { background: #2b3139; color: #fff; }
+
+        .rsi-bar { background: #0b0e11; padding: 4px 15px; font-size: 11px; color: var(--yellow); border-bottom: 1px solid #2b3139; }
+        
+        .chart-wrapper { 
+            height: 220px; background: #161a1e; position: relative; 
+            overflow-x: auto; border-bottom: 1px solid #2b3139;
+            background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 30px 30px;
+            scrollbar-width: none; touch-action: pan-x;
+        }
+        .chart-wrapper::-webkit-scrollbar { display: none; }
+        #chart-svg { display: block; height: 100%; }
+        
+        #chart-line { fill: none; stroke: var(--yellow); stroke-width: 2.5; transition: all 1s linear; }
+        #chart-area { transition: all 1s linear; opacity: 0.25; }
+        #pulse-inner, #pulse-outer { transition: all 1s linear; }
+
+        .price-line-expert { position: absolute; left: 0; width: 100%; border-top: 1px dashed var(--yellow); z-index: 10; pointer-events: none; transition: top 1s linear; }
+        .pulse-outer { fill: var(--yellow); opacity: 0.4; animation: pulse-anim 1.5s infinite; }
+        @keyframes pulse-anim { 0% { r: 4; opacity: 0.6; } 100% { r: 12; opacity: 0; } }
+
+        .trade-interface { display: grid; grid-template-columns: 1.1fr 0.9fr; padding: 15px; gap: 15px; border-bottom: 1px solid #2b3139; }
+        .tab { flex: 1; padding: 8px; text-align: center; font-size: 12px; font-weight: bold; cursor: pointer; color: var(--text-muted); border-radius: 4px; background: #2b3139; }
+        .tab.buy-active { background: var(--up); color: white; }
+        .tab.sell-active { background: var(--down); color: white; }
+        .input-box { background: var(--input-bg); border-radius: 4px; padding: 6px 10px; margin-bottom: 8px; border: 1px solid #474d57; }
+        .input-box input { background: transparent; border: none; color: white; font-size: 14px; width: 100%; outline: none; }
+        .exec-btn { width: 100%; padding: 14px; border: none; border-radius: 4px; font-weight: bold; font-size: 15px; color: white; cursor: pointer; }
+
+        .pos-card-binance { background: #161a1e; padding: 15px; border-bottom: 4px solid #0b0e11; margin-top: 2px; }
+        .pos-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .pos-side-badge { font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; }
+        .pos-side-badge.long { color: var(--up); background: rgba(2, 192, 118, 0.15); }
+        .pos-side-badge.short { color: var(--down); background: rgba(248, 73, 96, 0.15); }
+        
+        .pos-pnl-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .pos-pnl-val { font-size: 19px; font-weight: bold; }
+        .pos-roe-val { font-size: 19px; font-weight: bold; }
+        .pos-item-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+
+        .pos-data-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .pos-data-val { font-size: 12px; color: #fff; font-weight: 500; }
+        .close-btn-binance { width: 100%; padding: 10px; background: #2b3139; color: #fff; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
+
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        .modal-content { background: #1e2329; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="binance-container">
+    <div class="top-bar">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <b style="font-size:18px;">SHARK/USDT</b>
+            <span style="font-size:10px; color:var(--up); background:rgba(2, 192, 118, 0.1); padding:2px 4px;">Expert Line</span>
+        </div>
+        <div style="text-align:right">
+            <p id="top-price" style="margin:0; font-weight:bold; font-size:18px; color:var(--up);">0.005000</p>
+            <div id="top-change" style="font-size:11px; font-weight:bold; color:var(--up);">+0.00%</div>
+        </div>
+    </div>
+
+    <div class="wallet-overview">
+        <div style="display:flex; justify-content:space-between;">
+            <div>
+                <div style="font-size:11px; color:var(--text-muted);">Main Balance (USDT)</div>
+                <div class="equity-val" id="main-available">10.00</div>
+            </div>
+            <div style="text-align:right">
+                <div style="font-size:11px; color:var(--text-muted);">SHARK Tokens</div>
+                <div class="equity-val" id="shark-balance" style="color:var(--yellow);">0</div>
+            </div>
+        </div>
+        <div class="btn-group-sm" style="display:flex; gap:10px; margin-top:15px;">
+            <button class="btn-sm ad-btn-gold" onclick="watchAd()" style="flex:1">Watch Ad (+1$)</button>
+            <button class="btn-sm action-btn-grey" onclick="openWithdraw()" style="flex:1">Withdraw</button>
+        </div>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid #2b3139;">
+            <div style="font-size:11px; color:var(--text-muted);">Total Unrealized PNL</div>
+            <div id="total-pnl-display" style="font-size:18px; font-weight:bold; color:#fff;">0.0000 USDT</div>
+        </div>
+    </div>
+
+    <div class="rsi-bar">RSI(14): <span id="rsi-val">50.00</span></div>
+    
+    <div class="chart-wrapper" id="chart-scroll">
+        <svg id="chart-svg">
+            <defs>
+                <linearGradient id="expertGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:var(--yellow); stop-opacity:0.4" />
+                    <stop offset="100%" style="stop-color:transparent; stop-opacity:0" />
+                </linearGradient>
+            </defs>
+            <path id="chart-area" fill="url(#expertGrad)" d=""></path>
+            <path id="chart-line" d=""></path>
+            <circle id="pulse-outer" class="pulse-outer" r="8"></circle>
+            <circle id="pulse-inner" fill="white" stroke="var(--yellow)" stroke-width="2" r="4"></circle>
+        </svg>
+        <div class="price-line-expert" id="price-line"></div>
+    </div>
+
+    <div class="trade-interface">
+        <div class="trade-side">
+            <div style="display:flex; gap:5px; margin-bottom:12px;">
+                <div class="tab buy-active" id="buy-tab" onclick="setMode('BUY')">Long</div>
+                <div class="tab" id="sell-tab" onclick="setMode('SELL')">Short</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px;"><span>Leverage</span><span id="lev-label-show" style="color:var(--yellow); font-weight:bold;">10x</span></div>
+            <input type="range" id="lev-slider" min="1" max="20" value="10" style="width:100%; margin-bottom:15px;" oninput="document.getElementById('lev-label-show').innerText=this.value+'x'; syncCalc();">
+            <div class="input-box"><label style="font-size:10px; color:var(--text-muted);">Margin (USDT)</label><input type="number" id="trade-margin" placeholder="0.00" oninput="syncCalc()"></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">Size: <b id="view-size" style="color:#fff">0.00</b> USDT</div>
+            <button class="exec-btn" id="action-btn" style="background:var(--up)" onclick="openOrder()">Open Position</button>
+        </div>
+        <div id="orderbook" style="padding-left: 10px;">
+            <div id="asks-list"></div>
+            <div style="font-size:14px; font-weight:bold; margin:5px 0; color:#fff; text-align:center;" id="mid-price">0.005000</div>
+            <div id="bids-list"></div>
+        </div>
+    </div>
+
+    <div style="padding:10px 15px; font-weight:bold; border-bottom:1px solid #2b3139; font-size:14px;">Positions (<span id="pos-count">0</span>)</div>
+    <div id="positions-list"></div>
+</div>
+
+<div class="modal" id="withdraw-modal">
+    <div class="modal-content">
+        <h3 style="color:var(--yellow)">Withdraw SHARK</h3>
+        <input type="text" id="ton-addr" placeholder="TON Wallet Address" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
+        <input type="number" id="w-amount" placeholder="Amount (Min 10,000)" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
+        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit</button>
+        <button class="action-btn-grey" style="width:95%; margin-top:10px; padding:10px;" onclick="closeWithdraw()">Cancel</button>
+    </div>
+</div>
+
+<script>
+    // --- টেলিগ্রাম সেটআপ ---
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand(); // অ্যাপটি টেলিগ্রামে ফুল স্ক্রিন করবে
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyCIZV27gM4r7Jyv-JAnL8JhLC6c6QnZUEg",
+        authDomain: "novachat-11b83.firebaseapp.com",
+        databaseURL: "https://novachat-11b83-default-rtdb.firebaseio.com",
+        projectId: "novachat-11b83",
+        storageBucket: "novachat-11b83.appspot.com",
+        messagingSenderId: "488853706466",
+        appId: "1:488853706466:web:6e8ef8793ca04cf479b0bb"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ইউজারের ইউনিক আইডি (টেলিগ্রাম থেকে বা র্যান্ডম)
+    let userId = localStorage.getItem('shark_user_id') || "user_" + Math.floor(Math.random()*1000000);
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        userId = "tg_" + tg.initDataUnsafe.user.id;
+    }
+    localStorage.setItem('shark_user_id', userId);
+
+    let marketPrice = 0.005000;
+    let startDayPrice = 0.005000;
+    let walletCash = 10.00;
+    let sharkRewards = 0;
+    let history = []; 
+    let positions = [];
+    let tradeMode = 'BUY';
+    let pointGap = 15; 
+    let initialPinchDist = null;
+    let isUserScrolling = false;
+    const chartScroll = document.getElementById('chart-scroll');
+
+    function syncMarket() {
+        db.ref('market_history').limitToLast(80).on('value', (snap) => {
+            const data = snap.val();
+            if (data) {
+                history = Object.values(data).sort((a,b) => a.time - b.time);
+                marketPrice = history[history.length-1].close;
+                if(history.length > 0 && startDayPrice === 0.005) startDayPrice = history[0].close;
+                renderExpertChart();
+                updateUI();
+                renderOrderbook();
+                calculateRSI();
+            }
+        });
+    }
+
+    function renderExpertChart() {
+        const svg = document.getElementById('chart-svg');
+        const linePath = document.getElementById('chart-line');
+        const areaPath = document.getElementById('chart-area');
+        const pValues = history.map(x => x.close);
+        const min = Math.min(...pValues), max = Math.max(...pValues), range = max - min || 0.0001;
+        const h = 180, padding = 40;
+        const getY = (v) => h - padding - ((v - min) / range) * (h - padding * 2);
+
+        let d = "", areaD = "", lastX = 0, lastY = 0;
+        history.forEach((x, i) => {
+            let curX = i * pointGap;
+            let curY = getY(x.close);
+            if (i === 0) { d += `M ${curX} ${curY}`; areaD += `M ${curX} ${h} L ${curX} ${curY}`; }
+            else { d += ` L ${curX} ${curY}`; areaD += ` L ${curX} ${curY}`; }
+            lastX = curX; lastY = curY;
+        });
+
+        areaD += ` L ${lastX} ${h} Z`;
+        linePath.setAttribute('d', d); areaPath.setAttribute('d', areaD);
+        svg.setAttribute('width', Math.max(chartScroll.clientWidth, lastX + 100));
+
+        document.getElementById('pulse-inner').setAttribute('cx', lastX);
+        document.getElementById('pulse-inner').setAttribute('cy', lastY);
+        document.getElementById('pulse-outer').setAttribute('cx', lastX);
+        document.getElementById('pulse-outer').setAttribute('cy', lastY);
+        document.getElementById('price-line').style.top = lastY + "px";
+        document.getElementById('top-price').innerText = marketPrice.toFixed(6);
+
+        if(!isUserScrolling) chartScroll.scrollLeft = chartScroll.scrollWidth;
+        
+        let diff = marketPrice - startDayPrice;
+        let perc = (diff / startDayPrice * 100).toFixed(2);
+        document.getElementById('top-change').innerText = (diff >= 0 ? "+" : "") + perc + "%";
+        document.getElementById('top-change').style.color = diff >= 0 ? 'var(--up)' : 'var(--down)';
+    }
+
+    chartScroll.addEventListener('touchstart', e => {
+        if(e.touches.length === 2) initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        else isUserScrolling = true;
+    }, { passive: false });
+
+    chartScroll.addEventListener('touchmove', e => {
+        if(e.touches.length === 2 && initialPinchDist) {
+            let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            pointGap = Math.max(5, Math.min(60, pointGap + (dist - initialPinchDist) * 0.15));
+            initialPinchDist = dist; renderExpertChart();
+        }
+    }, { passive: false });
+
+    chartScroll.addEventListener('touchend', () => { initialPinchDist = null; setTimeout(()=>isUserScrolling=false, 3000); });
+
+    function calculateRSI() {
+        if(history.length < 15) return;
+        let gains = 0, losses = 0;
+        for(let i = history.length - 14; i < history.length; i++) {
+            let diff = history[i].close - history[i-1].close;
+            if(diff > 0) gains += diff; else losses -= diff;
+        }
+        let rs = (gains / 14) / (Math.abs(losses) / 14 || 0.0001);
+        document.getElementById('rsi-val').innerText = (100 - (100 / (1 + rs))).toFixed(2);
+    }
+
+    function updateUI() {
+        document.getElementById('main-available').innerText = walletCash.toFixed(2);
+        document.getElementById('shark-balance').innerText = Math.floor(sharkRewards);
+        document.getElementById('pos-count').innerText = positions.length;
+        const list = document.getElementById('positions-list'); list.innerHTML = "";
+        let totalPNL = 0;
+
+        positions.forEach((p, i) => {
+            let pnl = (p.type === 'BUY' ? (marketPrice - p.entry) : (p.entry - marketPrice)) * p.amount;
+            let roe = (pnl / p.margin * 100).toFixed(2);
+            let color = pnl >= 0 ? 'var(--up)' : 'var(--down)';
+            totalPNL += pnl;
+
+            if(roe <= -98) { closeTrade(i); return; } 
+
+            list.innerHTML += `
+                <div class="pos-card-binance">
+                    <div class="pos-header-row">
+                        <div>
+                            <span class="pos-side-badge ${p.type==='BUY'?'long':'short'}">${p.type==='BUY'?'Long':'Short'}</span>
+                            <span class="pos-pair-name">SHARKUSDT <span class="pos-lev-badge">Cross ${p.lev}x</span></span>
+                        </div>
+                    </div>
+                    <div class="pos-pnl-row">
+                        <div>
+                            <div class="pos-item-label">Unrealized PNL(USDT)</div>
+                            <div class="pos-pnl-val" style="color:${color}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)}</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div class="pos-item-label">ROE</div>
+                            <div class="pos-roe-val" style="color:${color}">${roe >= 0 ? '+' : ''}${roe}%</div>
+                        </div>
+                    </div>
+                    <div class="pos-data-grid">
+                        <div><div class="pos-item-label">Size (USDT)</div><div class="pos-data-val">${(p.margin * p.lev).toFixed(2)}</div></div>
+                        <div><div class="pos-item-label">Entry Price</div><div class="pos-data-val">${p.entry.toFixed(6)}</div></div>
+                        <div style="text-align:right"><div class="pos-item-label">Mark Price</div><div class="pos-data-val">${marketPrice.toFixed(6)}</div></div>
+                        <div><div class="pos-item-label">Margin (USDT)</div><div class="pos-data-val">${p.margin.toFixed(2)}</div></div>
+                        <div><div class="pos-item-label">Liq. Price</div><div class="pos-data-val" style="color:var(--yellow)">${p.liq.toFixed(6)}</div></div>
+                    </div>
+                    <button class="close-btn-binance" onclick="closeTrade(${i})">Close Position</button>
+                </div>`;
+        });
+        document.getElementById('total-pnl-display').innerText = totalPNL.toFixed(4) + " USDT";
+        document.getElementById('total-pnl-display').style.color = totalPNL >= 0 ? 'var(--up)' : 'var(--down)';
+    }
+
+    window.openOrder = () => {
+        if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades! (One Long/Short)");
+        let margin = parseFloat(document.getElementById('trade-margin').value);
+        let lev = parseInt(document.getElementById('lev-slider').value);
+        if(!margin || margin <= 0 || margin > walletCash) return alert("Check balance!");
+
+        walletCash = Math.max(0, walletCash - margin);
+        let liq = (tradeMode === 'BUY') ? marketPrice * (1 - 0.95/lev) : marketPrice * (1 + 0.95/lev);
+        positions.push({ type: tradeMode, entry: marketPrice, amount: (margin * lev) / marketPrice, margin, lev, liq });
+        sync();
+    }
+
+    window.closeTrade = (i) => {
+        let p = positions[i];
+        let pnl = (p.type === 'BUY' ? (marketPrice - p.entry) : (p.entry - marketPrice)) * p.amount;
+        if(pnl > 0) sharkRewards += (pnl * 3);
+        walletCash = Math.max(0, walletCash + p.margin + pnl);
+        positions.splice(i, 1);
+        sync();
+    }
+
+    window.watchAd = () => {
+        window.open("https://www.profitablecpmratenetwork.com/rarb5qds06?key=79349eb6a9357e2e416a3ef19425a5c1", '_blank');
+        walletCash += 1.0; sync(); updateUI();
+    }
+
+    function handleWithdrawSubmit() {
+        let amount = parseFloat(document.getElementById('w-amount').value);
+        if(amount < 10000 || amount > sharkRewards) return alert("Min 10,000 SHARK!");
+        sharkRewards -= amount; sync(); closeWithdraw(); alert("Submitted!");
+    }
+
+    function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
+    function loadUserData() { 
+        db.ref('users/' + userId).on('value', (s) => { 
+            const d = s.val(); if(d) { walletCash = Math.max(0, d.walletCash ?? 10); sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); }
+        }); 
+    }
+
+    function openWithdraw() { document.getElementById('withdraw-modal').style.display = 'flex'; }
+    function closeWithdraw() { document.getElementById('withdraw-modal').style.display = 'none'; }
+
+    function renderOrderbook() {
+        const askDiv = document.getElementById('asks-list'); const bidDiv = document.getElementById('bids-list');
+        askDiv.innerHTML = ""; bidDiv.innerHTML = "";
+        for(let i=0; i<5; i++) {
+            askDiv.innerHTML += `<div class="ob-row" style="color:var(--down)"><span>${(marketPrice + (i*0.0001)).toFixed(6)}</span><span>${(Math.random()*20).toFixed(2)}</span></div>`;
+            bidDiv.innerHTML += `<div class="ob-row" style="color:var(--up)"><span>${(marketPrice - (i*0.0001)).toFixed(6)}</span><span>${(Math.random()*20).toFixed(2)}</span></div>`;
+        }
+    }
+    window.setMode = (m) => { tradeMode = m; document.getElementById('buy-tab').className = m==='BUY'?'tab buy-active':'tab'; document.getElementById('sell-tab').className = m==='SELL'?'tab sell-active':'tab'; }
+    function syncCalc() { let m = parseFloat(document.getElementById('trade-margin').value) || 0; let l = parseInt(document.getElementById('lev-slider').value); document.getElementById('view-size').innerText = (m * l).toFixed(2); }
+
+    syncMarket(); loadUserData();
+    setInterval(() => {
+        let change = (Math.random() * 0.001 - 0.0005); 
+        marketPrice += change;
+        if (marketPrice < 0.0001) marketPrice = 0.0001;
+        if (marketPrice > 0.01) marketPrice = 0.01;
+        db.ref('market_history').push({ open: marketPrice, close: marketPrice + 0.00001, time: Date.now() });
+    }, 2000);
+</script>
+</body>
+</html>
