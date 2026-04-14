@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Binance Pro - Expert Edition</title>
     
-    <!-- টেলিগ্রাম মিনি অ্যাপের জন্য এই স্ক্রিপ্টটি মাস্ট -->
+    <!-- টেলিগ্রাম মিনি অ্যাপ SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> <!-- সিকিউরিটির জন্য নতুন সংযোজন -->
     
     <style>
         :root { 
@@ -159,16 +160,15 @@
         <h3 style="color:var(--yellow)">Withdraw SHARK</h3>
         <input type="text" id="ton-addr" placeholder="TON Wallet Address" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
         <input type="number" id="w-amount" placeholder="Amount (Min 10,000)" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
-        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit</button>
+        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit Request</button>
         <button class="action-btn-grey" style="width:95%; margin-top:10px; padding:10px;" onclick="closeWithdraw()">Cancel</button>
     </div>
 </div>
 
 <script>
-    // --- টেলিগ্রাম সেটআপ ---
+    // --- টেলিগ্রাম এবং ফায়ারবেস অথেনটিকেশন সেটআপ ---
     const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand(); // অ্যাপটি টেলিগ্রামে ফুল স্ক্রিন করবে
+    tg.ready(); tg.expand();
 
     const firebaseConfig = {
         apiKey: "AIzaSyCIZV27gM4r7Jyv-JAnL8JhLC6c6QnZUEg",
@@ -182,12 +182,13 @@
     
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const auth = firebase.auth();
 
-    // ইউজারের ইউনিক আইডি (টেলিগ্রাম থেকে বা র্যান্ডম)
+    // অ্যানোনিমাস লগইন চালু করা (হ্যাক থেকে বাঁচতে)
+    auth.signInAnonymously().catch((e) => console.error("Auth Fail", e.message));
+
     let userId = localStorage.getItem('shark_user_id') || "user_" + Math.floor(Math.random()*1000000);
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        userId = "tg_" + tg.initDataUnsafe.user.id;
-    }
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) { userId = "tg_" + tg.initDataUnsafe.user.id; }
     localStorage.setItem('shark_user_id', userId);
 
     let marketPrice = 0.005000;
@@ -209,10 +210,7 @@
                 history = Object.values(data).sort((a,b) => a.time - b.time);
                 marketPrice = history[history.length-1].close;
                 if(history.length > 0 && startDayPrice === 0.005) startDayPrice = history[0].close;
-                renderExpertChart();
-                updateUI();
-                renderOrderbook();
-                calculateRSI();
+                renderExpertChart(); updateUI(); renderOrderbook(); calculateRSI();
             }
         });
     }
@@ -225,7 +223,6 @@
         const min = Math.min(...pValues), max = Math.max(...pValues), range = max - min || 0.0001;
         const h = 180, padding = 40;
         const getY = (v) => h - padding - ((v - min) / range) * (h - padding * 2);
-
         let d = "", areaD = "", lastX = 0, lastY = 0;
         history.forEach((x, i) => {
             let curX = i * pointGap;
@@ -234,20 +231,16 @@
             else { d += ` L ${curX} ${curY}`; areaD += ` L ${curX} ${curY}`; }
             lastX = curX; lastY = curY;
         });
-
         areaD += ` L ${lastX} ${h} Z`;
         linePath.setAttribute('d', d); areaPath.setAttribute('d', areaD);
         svg.setAttribute('width', Math.max(chartScroll.clientWidth, lastX + 100));
-
         document.getElementById('pulse-inner').setAttribute('cx', lastX);
         document.getElementById('pulse-inner').setAttribute('cy', lastY);
         document.getElementById('pulse-outer').setAttribute('cx', lastX);
         document.getElementById('pulse-outer').setAttribute('cy', lastY);
         document.getElementById('price-line').style.top = lastY + "px";
         document.getElementById('top-price').innerText = marketPrice.toFixed(6);
-
         if(!isUserScrolling) chartScroll.scrollLeft = chartScroll.scrollWidth;
-        
         let diff = marketPrice - startDayPrice;
         let perc = (diff / startDayPrice * 100).toFixed(2);
         document.getElementById('top-change').innerText = (diff >= 0 ? "+" : "") + perc + "%";
@@ -258,7 +251,6 @@
         if(e.touches.length === 2) initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
         else isUserScrolling = true;
     }, { passive: false });
-
     chartScroll.addEventListener('touchmove', e => {
         if(e.touches.length === 2 && initialPinchDist) {
             let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
@@ -266,7 +258,6 @@
             initialPinchDist = dist; renderExpertChart();
         }
     }, { passive: false });
-
     chartScroll.addEventListener('touchend', () => { initialPinchDist = null; setTimeout(()=>isUserScrolling=false, 3000); });
 
     function calculateRSI() {
@@ -286,42 +277,20 @@
         document.getElementById('pos-count').innerText = positions.length;
         const list = document.getElementById('positions-list'); list.innerHTML = "";
         let totalPNL = 0;
-
         positions.forEach((p, i) => {
             let pnl = (p.type === 'BUY' ? (marketPrice - p.entry) : (p.entry - marketPrice)) * p.amount;
             let roe = (pnl / p.margin * 100).toFixed(2);
             let color = pnl >= 0 ? 'var(--up)' : 'var(--down)';
             totalPNL += pnl;
-
             if(roe <= -98) { closeTrade(i); return; } 
-
-            list.innerHTML += `
-                <div class="pos-card-binance">
-                    <div class="pos-header-row">
-                        <div>
-                            <span class="pos-side-badge ${p.type==='BUY'?'long':'short'}">${p.type==='BUY'?'Long':'Short'}</span>
-                            <span class="pos-pair-name">SHARKUSDT <span class="pos-lev-badge">Cross ${p.lev}x</span></span>
-                        </div>
-                    </div>
-                    <div class="pos-pnl-row">
-                        <div>
-                            <div class="pos-item-label">Unrealized PNL(USDT)</div>
-                            <div class="pos-pnl-val" style="color:${color}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)}</div>
-                        </div>
-                        <div style="text-align:right">
-                            <div class="pos-item-label">ROE</div>
-                            <div class="pos-roe-val" style="color:${color}">${roe >= 0 ? '+' : ''}${roe}%</div>
-                        </div>
-                    </div>
-                    <div class="pos-data-grid">
-                        <div><div class="pos-item-label">Size (USDT)</div><div class="pos-data-val">${(p.margin * p.lev).toFixed(2)}</div></div>
-                        <div><div class="pos-item-label">Entry Price</div><div class="pos-data-val">${p.entry.toFixed(6)}</div></div>
-                        <div style="text-align:right"><div class="pos-item-label">Mark Price</div><div class="pos-data-val">${marketPrice.toFixed(6)}</div></div>
-                        <div><div class="pos-item-label">Margin (USDT)</div><div class="pos-data-val">${p.margin.toFixed(2)}</div></div>
-                        <div><div class="pos-item-label">Liq. Price</div><div class="pos-data-val" style="color:var(--yellow)">${p.liq.toFixed(6)}</div></div>
-                    </div>
-                    <button class="close-btn-binance" onclick="closeTrade(${i})">Close Position</button>
-                </div>`;
+            list.innerHTML += `<div class="pos-card-binance">
+                <div class="pos-header-row"><div><span class="pos-side-badge ${p.type==='BUY'?'long':'short'}">${p.type}</span><span class="pos-pair-name">SHARKUSDT <span class="pos-lev-badge">Cross ${p.lev}x</span></span></div></div>
+                <div class="pos-pnl-row"><div><div class="pos-item-label">Unrealized PNL(USDT)</div><div class="pos-pnl-val" style="color:${color}">${pnl.toFixed(4)}</div></div>
+                <div style="text-align:right"><div class="pos-item-label">ROE</div><div class="pos-roe-val" style="color:${color}">${roe}%</div></div></div>
+                <div class="pos-data-grid"><div><div class="pos-item-label">Size(USDT)</div><div class="pos-data-val">${(p.margin*p.lev).toFixed(2)}</div></div>
+                <div><div class="pos-item-label">Entry Price</div><div class="pos-data-val">${p.entry.toFixed(6)}</div></div>
+                <div style="text-align:right"><div class="pos-item-label">Liq. Price</div><div class="pos-data-val" style="color:var(--yellow)">${p.liq.toFixed(6)}</div></div></div>
+                <button class="close-btn-binance" onclick="closeTrade(${i})">Close Position</button></div>`;
         });
         document.getElementById('total-pnl-display').innerText = totalPNL.toFixed(4) + " USDT";
         document.getElementById('total-pnl-display').style.color = totalPNL >= 0 ? 'var(--up)' : 'var(--down)';
@@ -331,8 +300,7 @@
         if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades! (One Long/Short)");
         let margin = parseFloat(document.getElementById('trade-margin').value);
         let lev = parseInt(document.getElementById('lev-slider').value);
-        if(!margin || margin <= 0 || margin > walletCash) return alert("Check balance!");
-
+        if(!margin || margin <= 0 || margin > walletCash) return alert("Check Balance!");
         walletCash = Math.max(0, walletCash - margin);
         let liq = (tradeMode === 'BUY') ? marketPrice * (1 - 0.95/lev) : marketPrice * (1 + 0.95/lev);
         positions.push({ type: tradeMode, entry: marketPrice, amount: (margin * lev) / marketPrice, margin, lev, liq });
@@ -340,12 +308,9 @@
     }
 
     window.closeTrade = (i) => {
-        let p = positions[i];
-        let pnl = (p.type === 'BUY' ? (marketPrice - p.entry) : (p.entry - marketPrice)) * p.amount;
+        let p = positions[i]; let pnl = (p.type === 'BUY' ? (marketPrice - p.entry) : (p.entry - marketPrice)) * p.amount;
         if(pnl > 0) sharkRewards += (pnl * 3);
-        walletCash = Math.max(0, walletCash + p.margin + pnl);
-        positions.splice(i, 1);
-        sync();
+        walletCash = Math.max(0, walletCash + p.margin + pnl); positions.splice(i, 1); sync();
     }
 
     window.watchAd = () => {
@@ -355,26 +320,20 @@
 
     function handleWithdrawSubmit() {
         let amount = parseFloat(document.getElementById('w-amount').value);
-        if(amount < 10000 || amount > sharkRewards) return alert("Min 10,000 SHARK!");
+        if(amount < 10000 || amount > sharkRewards) return alert("Check amount!");
         sharkRewards -= amount; sync(); closeWithdraw(); alert("Submitted!");
     }
 
     function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
-    function loadUserData() { 
-        db.ref('users/' + userId).on('value', (s) => { 
-            const d = s.val(); if(d) { walletCash = Math.max(0, d.walletCash ?? 10); sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); }
-        }); 
-    }
-
+    function loadUserData() { db.ref('users/' + userId).on('value', (s) => { const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); } }); }
     function openWithdraw() { document.getElementById('withdraw-modal').style.display = 'flex'; }
     function closeWithdraw() { document.getElementById('withdraw-modal').style.display = 'none'; }
-
     function renderOrderbook() {
         const askDiv = document.getElementById('asks-list'); const bidDiv = document.getElementById('bids-list');
         askDiv.innerHTML = ""; bidDiv.innerHTML = "";
         for(let i=0; i<5; i++) {
-            askDiv.innerHTML += `<div class="ob-row" style="color:var(--down)"><span>${(marketPrice + (i*0.0001)).toFixed(6)}</span><span>${(Math.random()*20).toFixed(2)}</span></div>`;
-            bidDiv.innerHTML += `<div class="ob-row" style="color:var(--up)"><span>${(marketPrice - (i*0.0001)).toFixed(6)}</span><span>${(Math.random()*20).toFixed(2)}</span></div>`;
+            askDiv.innerHTML += `<div class="ob-row" style="color:var(--down)"><span>${(marketPrice + (i*0.0001)).toFixed(6)}</span><span>${(Math.random()*15).toFixed(2)}</span></div>`;
+            bidDiv.innerHTML += `<div class="ob-row" style="color:var(--up)"><span>${(marketPrice - (i*0.0001)).toFixed(6)}</span><span>${(Math.random()*15).toFixed(2)}</span></div>`;
         }
     }
     window.setMode = (m) => { tradeMode = m; document.getElementById('buy-tab').className = m==='BUY'?'tab buy-active':'tab'; document.getElementById('sell-tab').className = m==='SELL'?'tab sell-active':'tab'; }
