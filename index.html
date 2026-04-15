@@ -192,9 +192,9 @@
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) { userId = "tg_" + tg.initDataUnsafe.user.id; }
     localStorage.setItem('shark_user_id', userId);
 
+    // রেফারেল লিঙ্ক আপডেট (টেলিগ্রাম লিঙ্কে সরাসরি নিয়ে যাওয়ার জন্য)
     const BOT_USERNAME = "TonTradeLiveBot"; 
-    const APP_NAME = "app";
-    let myRefLink = `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=${userId}`;
+    let myRefLink = `https://t.me/${BOT_USERNAME}?start=${userId}`;
 
     let marketPrice = 0.005000;
     let startDayPrice = 0.005000;
@@ -246,6 +246,7 @@
         document.getElementById('price-line').style.top = lastY + "px";
         document.getElementById('top-price').innerText = marketPrice.toFixed(6);
         if(!isUserScrolling) chartScroll.scrollLeft = chartScroll.scrollWidth;
+        
         let diff = marketPrice - startDayPrice;
         let perc = (diff / startDayPrice * 100).toFixed(2);
         let changeEl = document.getElementById('top-change');
@@ -354,7 +355,7 @@
         let amount = parseFloat(document.getElementById('w-amount').value);
         if(addr.length < 10) return alert("ভুল TON এড্রেস!");
         if(amount < 10000 || amount > sharkRewards) return alert("চেক এমাউন্ট!");
-        sharkRewards -= amount; sync(); closeWithdraw(); alert("রিকোয়েস্ট সাবমিট হয়েছে!");
+        sharkRewards -= amount; sync(); closeWithdraw(); alert("Submitted!");
     }
 
     function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
