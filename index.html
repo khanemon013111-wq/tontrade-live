@@ -160,7 +160,15 @@
         <h3 style="color:var(--yellow)">Withdraw SHARK</h3>
         <input type="text" id="ton-addr" placeholder="TON Wallet Address" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
         <input type="number" id="w-amount" placeholder="Amount (Min 10,000)" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
-        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit Request</button>
+        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit</button>
+        
+        <!-- দাদু, এখানে রেফারেল সিস্টেম যোগ করা হলো -->
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #474d57;">
+            <h4 style="color:var(--yellow); margin-bottom:5px;">Refer & Earn</h4>
+            <p style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">বন্ধুকে ইনভাইট করলেই পাবেন ৫$ + ৫০০ SHARK বোনাস!</p>
+            <button class="btn-sm ad-btn-gold" style="width: 95%;" onclick="copyRef()">Copy Referral Link</button>
+        </div>
+
         <button class="action-btn-grey" style="width:95%; margin-top:10px; padding:10px;" onclick="closeWithdraw()">Cancel</button>
     </div>
 </div>
@@ -184,12 +192,16 @@
     const db = firebase.database();
     const auth = firebase.auth();
 
-    // অ্যানোনিমাস লগইন চালু করা (হ্যাক থেকে বাঁচতে)
     auth.signInAnonymously().catch((e) => console.error("Auth Fail", e.message));
 
     let userId = localStorage.getItem('shark_user_id') || "user_" + Math.floor(Math.random()*1000000);
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) { userId = "tg_" + tg.initDataUnsafe.user.id; }
     localStorage.setItem('shark_user_id', userId);
+
+    // রেফারেল কনফিগারেশন (দাদু, এখানে আপনার বটের তথ্য দিন)
+    const BOT_USERNAME = "YourBotUsername"; // যেমন SharkTrade_bot
+    const APP_NAME = "YourAppName";       // আপনার অ্যাপের নাম
+    let myRefLink = `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=${userId}`;
 
     let marketPrice = 0.005000;
     let startDayPrice = 0.005000;
@@ -296,8 +308,38 @@
         document.getElementById('total-pnl-display').style.color = totalPNL >= 0 ? 'var(--up)' : 'var(--down)';
     }
 
+    // রেফারেল বোনাস লজিক
+    function checkReferral() {
+        let startParam = tg.initDataUnsafe.start_param;
+        if (startParam && startParam !== userId) {
+            const userRef = db.ref('users/' + userId);
+            userRef.once('value', (snap) => {
+                if (!snap.exists()) { // ইউজার একদম নতুন হলে বোনাস দিবে
+                    const refRef = db.ref('users/' + startParam);
+                    refRef.once('value', (refSnap) => {
+                        if (refSnap.exists()) {
+                            let rData = refSnap.val();
+                            db.ref('users/' + startParam).update({
+                                walletCash: (rData.walletCash || 0) + 5,
+                                sharkRewards: (rData.sharkRewards || 0) + 500
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    function copyRef() {
+        const el = document.createElement('textarea');
+        el.value = myRefLink; document.body.appendChild(el);
+        el.select(); document.execCommand('copy');
+        document.body.removeChild(el);
+        alert("Referral link copied!");
+    }
+
     window.openOrder = () => {
-        if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades! (One Long/Short)");
+        if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades!");
         let margin = parseFloat(document.getElementById('trade-margin').value);
         let lev = parseInt(document.getElementById('lev-slider').value);
         if(!margin || margin <= 0 || margin > walletCash) return alert("Check Balance!");
@@ -325,7 +367,12 @@
     }
 
     function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
-    function loadUserData() { db.ref('users/' + userId).on('value', (s) => { const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); } }); }
+    function loadUserData() { 
+        db.ref('users/' + userId).on('value', (s) => { 
+            const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); }
+        }); 
+    }
+
     function openWithdraw() { document.getElementById('withdraw-modal').style.display = 'flex'; }
     function closeWithdraw() { document.getElementById('withdraw-modal').style.display = 'none'; }
     function renderOrderbook() {
@@ -339,6 +386,7 @@
     window.setMode = (m) => { tradeMode = m; document.getElementById('buy-tab').className = m==='BUY'?'tab buy-active':'tab'; document.getElementById('sell-tab').className = m==='SELL'?'tab sell-active':'tab'; }
     function syncCalc() { let m = parseFloat(document.getElementById('trade-margin').value) || 0; let l = parseInt(document.getElementById('lev-slider').value); document.getElementById('view-size').innerText = (m * l).toFixed(2); }
 
+    checkReferral(); // বোনাস চেক
     syncMarket(); loadUserData();
     setInterval(() => {
         let change = (Math.random() * 0.001 - 0.0005); 
