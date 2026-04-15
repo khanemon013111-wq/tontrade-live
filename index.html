@@ -1,17 +1,17 @@
-<DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>TonTrade Live - Pro Edition</title>
+    <title>Binance Pro - Expert Edition</title>
     
-    <!-- টেলিগ্রাম মিনি অ্যাপ SDK -->
+    <!-- à¦Ÿà§‡à¦²à¦¿à¦—à§à¦°à¦¾à¦® à¦®à¦¿à¦¨à¦¿ à¦…à§à¦¯à¦¾à¦ª SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> 
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> <!-- à¦¸à¦¿à¦•à¦¿à¦‰à¦°à¦¿à¦Ÿà¦¿à¦° à¦œà¦¨à§à¦¯ à¦¨à¦¤à§à¦¨ à¦¸à¦‚à¦¯à§‹à¦œà¦¨ -->
     
     <style>
         :root { 
@@ -32,22 +32,23 @@
         .ad-btn-gold { background: var(--yellow); color: #000; }
         .action-btn-grey { background: #2b3139; color: #fff; }
 
-        /* Expert Chart UI */
+        .rsi-bar { background: #0b0e11; padding: 4px 15px; font-size: 11px; color: var(--yellow); border-bottom: 1px solid #2b3139; }
+        
         .chart-wrapper { 
             height: 220px; background: #161a1e; position: relative; 
             overflow-x: auto; border-bottom: 1px solid #2b3139;
             background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
             background-size: 30px 30px;
-            scrollbar-width: none; touch-action: none;
+            scrollbar-width: none; touch-action: pan-x;
         }
         .chart-wrapper::-webkit-scrollbar { display: none; }
         #chart-svg { display: block; height: 100%; }
         
-        #chart-line { fill: none; stroke: var(--yellow); stroke-width: 2.5; transition: all 0.5s linear; }
-        #chart-area { transition: all 0.5s linear; opacity: 0.25; }
-        #pulse-inner, #pulse-outer { transition: all 0.5s linear; }
+        #chart-line { fill: none; stroke: var(--yellow); stroke-width: 2.5; transition: all 1s linear; }
+        #chart-area { transition: all 1s linear; opacity: 0.25; }
+        #pulse-inner, #pulse-outer { transition: all 1s linear; }
 
-        .price-line-expert { position: absolute; left: 0; width: 100%; border-top: 1px dashed var(--yellow); z-index: 10; pointer-events: none; transition: top 0.5s linear; }
+        .price-line-expert { position: absolute; left: 0; width: 100%; border-top: 1px dashed var(--yellow); z-index: 10; pointer-events: none; transition: top 1s linear; }
         .pulse-outer { fill: var(--yellow); opacity: 0.4; animation: pulse-anim 1.5s infinite; }
         @keyframes pulse-anim { 0% { r: 4; opacity: 0.6; } 100% { r: 12; opacity: 0; } }
 
@@ -59,21 +60,23 @@
         .input-box input { background: transparent; border: none; color: white; font-size: 14px; width: 100%; outline: none; }
         .exec-btn { width: 100%; padding: 14px; border: none; border-radius: 4px; font-weight: bold; font-size: 15px; color: white; cursor: pointer; }
 
-        /* Binance Position Card */
         .pos-card-binance { background: #161a1e; padding: 15px; border-bottom: 4px solid #0b0e11; margin-top: 2px; }
         .pos-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .pos-side-badge { font-size: 10px; font-weight: bold; padding: 2px 4px; border-radius: 2px; }
         .pos-side-badge.long { color: var(--up); background: rgba(2, 192, 118, 0.15); }
         .pos-side-badge.short { color: var(--down); background: rgba(248, 73, 96, 0.15); }
+        
+        .pos-pnl-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .pos-pnl-val { font-size: 19px; font-weight: bold; }
         .pos-roe-val { font-size: 19px; font-weight: bold; }
         .pos-item-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+
         .pos-data-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         .pos-data-val { font-size: 12px; color: #fff; font-weight: 500; }
         .close-btn-binance { width: 100%; padding: 10px; background: #2b3139; color: #fff; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
 
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-        .modal-content { background: #1e2329; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #474d57; }
+        .modal-content { background: #1e2329; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
@@ -158,17 +161,12 @@
         <input type="text" id="ton-addr" placeholder="TON Wallet Address" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
         <input type="number" id="w-amount" placeholder="Amount (Min 10,000)" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
         <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit Request</button>
-        
-        <div style="margin-top:20px; padding:10px; border:1px dashed var(--yellow); border-radius:8px; background:rgba(252,213,53,0.05)">
-            <p style="font-size:12px; margin:0 0 10px 0; color:var(--yellow)">Invite Friend & Earn 5$ + 500 SHARK</p>
-            <button class="btn-sm ad-btn-gold" style="width:100%" onclick="copyRef()">Copy Referral Link</button>
-        </div>
-
         <button class="action-btn-grey" style="width:95%; margin-top:10px; padding:10px;" onclick="closeWithdraw()">Cancel</button>
     </div>
 </div>
 
 <script>
+    // --- à¦Ÿà§‡à¦²à¦¿à¦—à§à¦°à¦¾à¦® à¦à¦¬à¦‚ à¦«à¦¾à§Ÿà¦¾à¦°à¦¬à§‡à¦¸ à¦…à¦¥à§‡à¦¨à¦Ÿà¦¿à¦•à§‡à¦¶à¦¨ à¦¸à§‡à¦Ÿà¦†à¦ª ---
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand();
 
@@ -185,14 +183,13 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
-    auth.signInAnonymously();
+
+    // à¦…à§à¦¯à¦¾à¦¨à§‹à¦¨à¦¿à¦®à¦¾à¦¸ à¦²à¦—à¦‡à¦¨ à¦šà¦¾à¦²à§ à¦•à¦°à¦¾ (à¦¹à§à¦¯à¦¾à¦• à¦¥à§‡à¦•à§‡ à¦¬à¦¾à¦à¦šà¦¤à§‡)
+    auth.signInAnonymously().catch((e) => console.error("Auth Fail", e.message));
 
     let userId = localStorage.getItem('shark_user_id') || "user_" + Math.floor(Math.random()*1000000);
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) { userId = "tg_" + tg.initDataUnsafe.user.id; }
     localStorage.setItem('shark_user_id', userId);
-
-    const BOT_USERNAME = "TonTradeLiveBot"; 
-    let myRefLink = `https://t.me/${BOT_USERNAME}/app?startapp=${userId}`;
 
     let marketPrice = 0.005000;
     let startDayPrice = 0.005000;
@@ -201,35 +198,10 @@
     let history = []; 
     let positions = [];
     let tradeMode = 'BUY';
-    let candleWidth = 15; 
+    let pointGap = 15; 
     let initialPinchDist = null;
     let isUserScrolling = false;
     const chartScroll = document.getElementById('chart-scroll');
-
-    // --- উন্নত রেফারেল লজিক (১০০% কার্যকর) ---
-    function checkReferral() {
-        let startParam = tg.initDataUnsafe.start_param;
-        if (startParam && startParam !== userId) {
-            const currentUserRef = db.ref('users/' + userId);
-            currentUserRef.once('value', (snap) => {
-                if (!snap.exists()) { // শুধু নতুন ইউজারদের ক্ষেত্রে বোনাস কাজ করবে
-                    const referrerRef = db.ref('users/' + startParam);
-                    referrerRef.once('value', (refSnap) => {
-                        if (refSnap.exists()) {
-                            let d = refSnap.val();
-                            // রেফারকারীকে বোনাস দেওয়া
-                            referrerRef.update({
-                                walletCash: (d.walletCash || 0) + 5,
-                                sharkRewards: (d.sharkRewards || 0) + 500
-                            });
-                        }
-                    });
-                    // নতুন ইউজারকে ইনিশিয়েট করা যাতে বারবার বোনাস না যায়
-                    currentUserRef.set({ walletCash: 10, sharkRewards: 0, referredBy: startParam });
-                }
-            });
-        }
-    }
 
     function syncMarket() {
         db.ref('market_history').limitToLast(80).on('value', (snap) => {
@@ -237,7 +209,7 @@
             if (data) {
                 history = Object.values(data).sort((a,b) => a.time - b.time);
                 marketPrice = history[history.length-1].close;
-                if(history.length > 0) startDayPrice = history[0].close; 
+                if(history.length > 0 && startDayPrice === 0.005) startDayPrice = history[0].close;
                 renderExpertChart(); updateUI(); renderOrderbook(); calculateRSI();
             }
         });
@@ -253,7 +225,7 @@
         const getY = (v) => h - padding - ((v - min) / range) * (h - padding * 2);
         let d = "", areaD = "", lastX = 0, lastY = 0;
         history.forEach((x, i) => {
-            let curX = i * candleWidth;
+            let curX = i * pointGap;
             let curY = getY(x.close);
             if (i === 0) { d += `M ${curX} ${curY}`; areaD += `M ${curX} ${h} L ${curX} ${curY}`; }
             else { d += ` L ${curX} ${curY}`; areaD += ` L ${curX} ${curY}`; }
@@ -269,31 +241,23 @@
         document.getElementById('price-line').style.top = lastY + "px";
         document.getElementById('top-price').innerText = marketPrice.toFixed(6);
         if(!isUserScrolling) chartScroll.scrollLeft = chartScroll.scrollWidth;
-        
         let diff = marketPrice - startDayPrice;
         let perc = (diff / startDayPrice * 100).toFixed(2);
-        let changeEl = document.getElementById('top-change');
-        changeEl.innerText = (diff >= 0 ? "+" : "") + perc + "%";
-        changeEl.style.color = diff >= 0 ? 'var(--up)' : 'var(--down)';
+        document.getElementById('top-change').innerText = (diff >= 0 ? "+" : "") + perc + "%";
+        document.getElementById('top-change').style.color = diff >= 0 ? 'var(--up)' : 'var(--down)';
     }
 
-    // Pinch Zoom লজিক
     chartScroll.addEventListener('touchstart', e => {
-        if(e.touches.length === 2) {
-            initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            e.preventDefault(); 
-        } else { isUserScrolling = true; }
+        if(e.touches.length === 2) initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        else isUserScrolling = true;
     }, { passive: false });
-
     chartScroll.addEventListener('touchmove', e => {
         if(e.touches.length === 2 && initialPinchDist) {
-            e.preventDefault();
             let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            candleWidth = Math.max(5, Math.min(80, candleWidth + (dist - initialPinchDist) * 0.1));
+            pointGap = Math.max(5, Math.min(60, pointGap + (dist - initialPinchDist) * 0.15));
             initialPinchDist = dist; renderExpertChart();
         }
     }, { passive: false });
-
     chartScroll.addEventListener('touchend', () => { initialPinchDist = null; setTimeout(()=>isUserScrolling=false, 3000); });
 
     function calculateRSI() {
@@ -301,7 +265,7 @@
         let gains = 0, losses = 0;
         for(let i = history.length - 14; i < history.length; i++) {
             let diff = history[i].close - history[i-1].close;
-            if(diff > 0) gains += diff; else losses += Math.abs(diff);
+            if(diff > 0) gains += diff; else losses -= diff;
         }
         let rs = (gains / 14) / (Math.abs(losses) / 14 || 0.0001);
         document.getElementById('rsi-val').innerText = (100 - (100 / (1 + rs))).toFixed(2);
@@ -332,12 +296,6 @@
         document.getElementById('total-pnl-display').style.color = totalPNL >= 0 ? 'var(--up)' : 'var(--down)';
     }
 
-    function copyRef() {
-        const el = document.createElement('textarea'); el.value = myRefLink;
-        document.body.appendChild(el); el.select(); document.execCommand('copy');
-        document.body.removeChild(el); alert("রেফার লিঙ্ক কপি হয়েছে!");
-    }
-
     window.openOrder = () => {
         if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades! (One Long/Short)");
         let margin = parseFloat(document.getElementById('trade-margin').value);
@@ -361,17 +319,13 @@
     }
 
     function handleWithdrawSubmit() {
-        let addr = document.getElementById('ton-addr').value.trim();
         let amount = parseFloat(document.getElementById('w-amount').value);
-        if(addr.length < 10) return alert("ভুল TON এড্রেস!");
-        if(amount < 10000 || amount > sharkRewards) return alert("ব্যালেন্স বা এড্রেস চেক করুন!");
+        if(amount < 10000 || amount > sharkRewards) return alert("Check amount!");
         sharkRewards -= amount; sync(); closeWithdraw(); alert("Submitted!");
     }
 
     function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
-    function loadUserData() { 
-        db.ref('users/' + userId).on('value', (s) => { const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); } }); 
-    }
+    function loadUserData() { db.ref('users/' + userId).on('value', (s) => { const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); } }); }
     function openWithdraw() { document.getElementById('withdraw-modal').style.display = 'flex'; }
     function closeWithdraw() { document.getElementById('withdraw-modal').style.display = 'none'; }
     function renderOrderbook() {
@@ -385,7 +339,7 @@
     window.setMode = (m) => { tradeMode = m; document.getElementById('buy-tab').className = m==='BUY'?'tab buy-active':'tab'; document.getElementById('sell-tab').className = m==='SELL'?'tab sell-active':'tab'; }
     function syncCalc() { let m = parseFloat(document.getElementById('trade-margin').value) || 0; let l = parseInt(document.getElementById('lev-slider').value); document.getElementById('view-size').innerText = (m * l).toFixed(2); }
 
-    checkReferral(); syncMarket(); loadUserData();
+    syncMarket(); loadUserData();
     setInterval(() => {
         let change = (Math.random() * 0.001 - 0.0005); 
         marketPrice += change;
