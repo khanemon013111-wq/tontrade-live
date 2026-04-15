@@ -1,14 +1,14 @@
-<!DOCTYPE html>
+<DOCTYPE html>
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>TonTrade Live - Pro Edition</title>
     
+    <!-- টেলিগ্রাম মিনি অ্যাপ SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <script src="https://sad.adsgram.ai/js/adsgram-ad-sdk.js"></script>
-    
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> 
@@ -111,7 +111,7 @@
         </div>
     </div>
 
-    <div class="rsi-bar" style="padding: 10px 15px; font-size: 12px;">RSI(14): <span id="rsi-val">50.00</span></div>
+    <div class="rsi-bar">RSI(14): <span id="rsi-val">50.00</span></div>
     
     <div class="chart-wrapper" id="chart-scroll">
         <svg id="chart-svg">
@@ -169,9 +169,6 @@
 </div>
 
 <script>
-    // --- Adsgram Setup ---
-    const AdController = window.Adsgram.init({ blockId: "bot-27831" });
-
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand();
 
@@ -209,36 +206,25 @@
     let isUserScrolling = false;
     const chartScroll = document.getElementById('chart-scroll');
 
-    // --- ভিডিও এডের কাজ ---
-    window.watchAd = () => {
-        AdController.show().then((result) => {
-            if (result.done) {
-                walletCash += 1.0; 
-                sync(); 
-                updateUI();
-                alert("অভিনন্দন! আপনি ১ ডলার বোনাস পেয়েছেন।");
-            }
-        }).catch((err) => {
-            alert("দুঃখিত, এই মুহূর্তে কোনো ভিডিও অ্যাড নেই।");
-        });
-    }
-
+    // --- উন্নত রেফারেল লজিক (১০০% কার্যকর) ---
     function checkReferral() {
         let startParam = tg.initDataUnsafe.start_param;
         if (startParam && startParam !== userId) {
             const currentUserRef = db.ref('users/' + userId);
             currentUserRef.once('value', (snap) => {
-                if (!snap.exists()) {
+                if (!snap.exists()) { // শুধু নতুন ইউজারদের ক্ষেত্রে বোনাস কাজ করবে
                     const referrerRef = db.ref('users/' + startParam);
                     referrerRef.once('value', (refSnap) => {
                         if (refSnap.exists()) {
                             let d = refSnap.val();
+                            // রেফারকারীকে বোনাস দেওয়া
                             referrerRef.update({
                                 walletCash: (d.walletCash || 0) + 5,
                                 sharkRewards: (d.sharkRewards || 0) + 500
                             });
                         }
                     });
+                    // নতুন ইউজারকে ইনিশিয়েট করা যাতে বারবার বোনাস না যায়
                     currentUserRef.set({ walletCash: 10, sharkRewards: 0, referredBy: startParam });
                 }
             });
@@ -291,6 +277,25 @@
         changeEl.style.color = diff >= 0 ? 'var(--up)' : 'var(--down)';
     }
 
+    // Pinch Zoom লজিক
+    chartScroll.addEventListener('touchstart', e => {
+        if(e.touches.length === 2) {
+            initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            e.preventDefault(); 
+        } else { isUserScrolling = true; }
+    }, { passive: false });
+
+    chartScroll.addEventListener('touchmove', e => {
+        if(e.touches.length === 2 && initialPinchDist) {
+            e.preventDefault();
+            let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            candleWidth = Math.max(5, Math.min(80, candleWidth + (dist - initialPinchDist) * 0.1));
+            initialPinchDist = dist; renderExpertChart();
+        }
+    }, { passive: false });
+
+    chartScroll.addEventListener('touchend', () => { initialPinchDist = null; setTimeout(()=>isUserScrolling=false, 3000); });
+
     function calculateRSI() {
         if(history.length < 15) return;
         let gains = 0, losses = 0;
@@ -313,9 +318,14 @@
             let roe = (pnl / p.margin * 100).toFixed(2);
             let color = pnl >= 0 ? 'var(--up)' : 'var(--down)';
             totalPNL += pnl;
+            if(roe <= -98) { closeTrade(i); return; } 
             list.innerHTML += `<div class="pos-card-binance">
-                <div class="pos-header-row"><div><span class="pos-side-badge ${p.type==='BUY'?'long':'short'}">${p.type}</span><span class="pos-pair-name">SHARKUSDT Cross ${p.lev}x</span></div></div>
-                <div style="font-size:19px; font-weight:bold; color:${color}">${pnl.toFixed(4)} USDT (${roe}%)</div>
+                <div class="pos-header-row"><div><span class="pos-side-badge ${p.type==='BUY'?'long':'short'}">${p.type}</span><span class="pos-pair-name">SHARKUSDT <span class="pos-lev-badge">Cross ${p.lev}x</span></span></div></div>
+                <div class="pos-pnl-row"><div><div class="pos-item-label">Unrealized PNL(USDT)</div><div class="pos-pnl-val" style="color:${color}">${pnl.toFixed(4)}</div></div>
+                <div style="text-align:right"><div class="pos-item-label">ROE</div><div class="pos-roe-val" style="color:${color}">${roe}%</div></div></div>
+                <div class="pos-data-grid"><div><div class="pos-item-label">Size(USDT)</div><div class="pos-data-val">${(p.margin*p.lev).toFixed(2)}</div></div>
+                <div><div class="pos-item-label">Entry Price</div><div class="pos-data-val">${p.entry.toFixed(6)}</div></div>
+                <div style="text-align:right"><div class="pos-item-label">Liq. Price</div><div class="pos-data-val" style="color:var(--yellow)">${p.liq.toFixed(6)}</div></div></div>
                 <button class="close-btn-binance" onclick="closeTrade(${i})">Close Position</button></div>`;
         });
         document.getElementById('total-pnl-display').innerText = totalPNL.toFixed(4) + " USDT";
@@ -329,18 +339,25 @@
     }
 
     window.openOrder = () => {
-        if(positions.length >= 2) return alert("Limit 2 Trades!");
+        if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades! (One Long/Short)");
         let margin = parseFloat(document.getElementById('trade-margin').value);
         let lev = parseInt(document.getElementById('lev-slider').value);
-        if(!margin || margin > walletCash) return alert("Check Balance!");
-        walletCash -= margin;
-        positions.push({ type: tradeMode, entry: marketPrice, amount: (margin * lev) / marketPrice, margin, lev, liq: (tradeMode === 'BUY') ? marketPrice * (1 - 0.95/lev) : marketPrice * (1 + 0.95/lev) });
+        if(!margin || margin <= 0 || margin > walletCash) return alert("Check Balance!");
+        walletCash = Math.max(0, walletCash - margin);
+        let liq = (tradeMode === 'BUY') ? marketPrice * (1 - 0.95/lev) : marketPrice * (1 + 0.95/lev);
+        positions.push({ type: tradeMode, entry: marketPrice, amount: (margin * lev) / marketPrice, margin, lev, liq });
         sync();
     }
 
     window.closeTrade = (i) => {
         let p = positions[i]; let pnl = (p.type === 'BUY' ? (marketPrice - p.entry) : (p.entry - marketPrice)) * p.amount;
-        walletCash += (p.margin + pnl); positions.splice(i, 1); sync();
+        if(pnl > 0) sharkRewards += (pnl * 3);
+        walletCash = Math.max(0, walletCash + p.margin + pnl); positions.splice(i, 1); sync();
+    }
+
+    window.watchAd = () => {
+        window.open("https://www.profitablecpmratenetwork.com/rarb5qds06?key=79349eb6a9357e2e416a3ef19425a5c1", '_blank');
+        walletCash += 1.0; sync(); updateUI();
     }
 
     function handleWithdrawSubmit() {
@@ -348,10 +365,10 @@
         let amount = parseFloat(document.getElementById('w-amount').value);
         if(addr.length < 10) return alert("ভুল TON এড্রেস!");
         if(amount < 10000 || amount > sharkRewards) return alert("ব্যালেন্স বা এড্রেস চেক করুন!");
-        sharkRewards -= amount; sync(); closeWithdraw(); alert("প্রক্রিয়াধীন আছে!");
+        sharkRewards -= amount; sync(); closeWithdraw(); alert("Submitted!");
     }
 
-    function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); updateUI(); }
+    function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
     function loadUserData() { 
         db.ref('users/' + userId).on('value', (s) => { const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); } }); 
     }
@@ -370,12 +387,11 @@
 
     checkReferral(); syncMarket(); loadUserData();
     setInterval(() => {
-        marketPrice += (Math.random() * 0.0002 - 0.0001);
-        history.push({close: marketPrice, time: Date.now()});
-        if(history.length > 50) history.shift();
-        renderExpertChart();
-        calculateRSI();
-        updateUI();
+        let change = (Math.random() * 0.001 - 0.0005); 
+        marketPrice += change;
+        if (marketPrice < 0.0001) marketPrice = 0.0001;
+        if (marketPrice > 0.01) marketPrice = 0.01;
+        db.ref('market_history').push({ open: marketPrice, close: marketPrice + 0.00001, time: Date.now() });
     }, 2000);
 </script>
 </body>
