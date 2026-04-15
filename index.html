@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Binance Pro - Expert Edition</title>
+    <title>TonTrade Live - Expert Edition</title>
     
     <!-- টেলিগ্রাম মিনি অ্যাপ SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -11,7 +11,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> <!-- সিকিউরিটির জন্য নতুন সংযোজন -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script> 
     
     <style>
         :root { 
@@ -32,8 +32,6 @@
         .ad-btn-gold { background: var(--yellow); color: #000; }
         .action-btn-grey { background: #2b3139; color: #fff; }
 
-        .rsi-bar { background: #0b0e11; padding: 4px 15px; font-size: 11px; color: var(--yellow); border-bottom: 1px solid #2b3139; }
-        
         .chart-wrapper { 
             height: 220px; background: #161a1e; position: relative; 
             overflow-x: auto; border-bottom: 1px solid #2b3139;
@@ -76,7 +74,7 @@
         .close-btn-binance { width: 100%; padding: 10px; background: #2b3139; color: #fff; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
 
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-        .modal-content { background: #1e2329; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; text-align: center; }
+        .modal-content { background: #1e2329; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #474d57; }
     </style>
 </head>
 <body>
@@ -160,13 +158,11 @@
         <h3 style="color:var(--yellow)">Withdraw SHARK</h3>
         <input type="text" id="ton-addr" placeholder="TON Wallet Address" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
         <input type="number" id="w-amount" placeholder="Amount (Min 10,000)" style="width:90%; padding:10px; margin-bottom:10px; background:#2b3139; border:1px solid #474d57; color:#fff; border-radius:5px;">
-        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit</button>
+        <button class="exec-btn" style="background:var(--up); width:95%" onclick="handleWithdrawSubmit()">Submit Request</button>
         
-        <!-- দাদু, এখানে রেফারেল সিস্টেম যোগ করা হলো -->
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed #474d57;">
-            <h4 style="color:var(--yellow); margin-bottom:5px;">Refer & Earn</h4>
-            <p style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">বন্ধুকে ইনভাইট করলেই পাবেন ৫$ + ৫০০ SHARK বোনাস!</p>
-            <button class="btn-sm ad-btn-gold" style="width: 95%;" onclick="copyRef()">Copy Referral Link</button>
+        <div style="margin-top:20px; padding:10px; border:1px dashed var(--yellow); border-radius:8px; background:rgba(252,213,53,0.05)">
+            <p style="font-size:12px; margin:0 0 10px 0; color:var(--yellow)">Invite Friend & Earn 5$ + 500 SHARK</p>
+            <button class="btn-sm ad-btn-gold" style="width:100%" onclick="copyRef()">Copy Referral Link</button>
         </div>
 
         <button class="action-btn-grey" style="width:95%; margin-top:10px; padding:10px;" onclick="closeWithdraw()">Cancel</button>
@@ -174,7 +170,6 @@
 </div>
 
 <script>
-    // --- টেলিগ্রাম এবং ফায়ারবেস অথেনটিকেশন সেটআপ ---
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand();
 
@@ -191,16 +186,14 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
-
-    auth.signInAnonymously().catch((e) => console.error("Auth Fail", e.message));
+    auth.signInAnonymously();
 
     let userId = localStorage.getItem('shark_user_id') || "user_" + Math.floor(Math.random()*1000000);
     if (tg.initDataUnsafe && tg.initDataUnsafe.user) { userId = "tg_" + tg.initDataUnsafe.user.id; }
     localStorage.setItem('shark_user_id', userId);
 
-    // রেফারেল কনফিগারেশন (দাদু, এখানে আপনার বটের তথ্য দিন)
-    const BOT_USERNAME = "YourBotUsername"; // যেমন SharkTrade_bot
-    const APP_NAME = "YourAppName";       // আপনার অ্যাপের নাম
+    const BOT_USERNAME = "TonTradeLiveBot"; 
+    const APP_NAME = "app";
     let myRefLink = `https://t.me/${BOT_USERNAME}/${APP_NAME}?startapp=${userId}`;
 
     let marketPrice = 0.005000;
@@ -221,7 +214,7 @@
             if (data) {
                 history = Object.values(data).sort((a,b) => a.time - b.time);
                 marketPrice = history[history.length-1].close;
-                if(history.length > 0 && startDayPrice === 0.005) startDayPrice = history[0].close;
+                if(history.length > 0) startDayPrice = history[0].close; 
                 renderExpertChart(); updateUI(); renderOrderbook(); calculateRSI();
             }
         });
@@ -255,8 +248,9 @@
         if(!isUserScrolling) chartScroll.scrollLeft = chartScroll.scrollWidth;
         let diff = marketPrice - startDayPrice;
         let perc = (diff / startDayPrice * 100).toFixed(2);
-        document.getElementById('top-change').innerText = (diff >= 0 ? "+" : "") + perc + "%";
-        document.getElementById('top-change').style.color = diff >= 0 ? 'var(--up)' : 'var(--down)';
+        let changeEl = document.getElementById('top-change');
+        changeEl.innerText = (diff >= 0 ? "+" : "") + perc + "%";
+        changeEl.style.color = diff >= 0 ? 'var(--up)' : 'var(--down)';
     }
 
     chartScroll.addEventListener('touchstart', e => {
@@ -308,20 +302,17 @@
         document.getElementById('total-pnl-display').style.color = totalPNL >= 0 ? 'var(--up)' : 'var(--down)';
     }
 
-    // রেফারেল বোনাস লজিক
     function checkReferral() {
         let startParam = tg.initDataUnsafe.start_param;
         if (startParam && startParam !== userId) {
-            const userRef = db.ref('users/' + userId);
-            userRef.once('value', (snap) => {
-                if (!snap.exists()) { // ইউজার একদম নতুন হলে বোনাস দিবে
-                    const refRef = db.ref('users/' + startParam);
-                    refRef.once('value', (refSnap) => {
+            db.ref('users/' + userId).once('value', (snap) => {
+                if (!snap.exists()) {
+                    db.ref('users/' + startParam).once('value', (refSnap) => {
                         if (refSnap.exists()) {
-                            let rData = refSnap.val();
+                            let d = refSnap.val();
                             db.ref('users/' + startParam).update({
-                                walletCash: (rData.walletCash || 0) + 5,
-                                sharkRewards: (rData.sharkRewards || 0) + 500
+                                walletCash: (d.walletCash || 0) + 5,
+                                sharkRewards: (d.sharkRewards || 0) + 500
                             });
                         }
                     });
@@ -331,15 +322,13 @@
     }
 
     function copyRef() {
-        const el = document.createElement('textarea');
-        el.value = myRefLink; document.body.appendChild(el);
-        el.select(); document.execCommand('copy');
-        document.body.removeChild(el);
-        alert("Referral link copied!");
+        const el = document.createElement('textarea'); el.value = myRefLink;
+        document.body.appendChild(el); el.select(); document.execCommand('copy');
+        document.body.removeChild(el); alert("রেফার লিঙ্ক কপি হয়েছে!");
     }
 
     window.openOrder = () => {
-        if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades!");
+        if(positions.length >= 2 || positions.find(x => x.type === tradeMode)) return alert("Limit 2 Trades! (One Long/Short)");
         let margin = parseFloat(document.getElementById('trade-margin').value);
         let lev = parseInt(document.getElementById('lev-slider').value);
         if(!margin || margin <= 0 || margin > walletCash) return alert("Check Balance!");
@@ -361,18 +350,17 @@
     }
 
     function handleWithdrawSubmit() {
+        let addr = document.getElementById('ton-addr').value.trim();
         let amount = parseFloat(document.getElementById('w-amount').value);
-        if(amount < 10000 || amount > sharkRewards) return alert("Check amount!");
-        sharkRewards -= amount; sync(); closeWithdraw(); alert("Submitted!");
+        if(addr.length < 10) return alert("ভুল TON এড্রেস!");
+        if(amount < 10000 || amount > sharkRewards) return alert("চেক এমাউন্ট!");
+        sharkRewards -= amount; sync(); closeWithdraw(); alert("রিকোয়েস্ট সাবমিট হয়েছে!");
     }
 
     function sync() { db.ref('users/' + userId).update({ walletCash, sharkRewards, positions }); }
     function loadUserData() { 
-        db.ref('users/' + userId).on('value', (s) => { 
-            const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); }
-        }); 
+        db.ref('users/' + userId).on('value', (s) => { const d = s.val(); if(d) { walletCash = d.walletCash ?? 10; sharkRewards = d.sharkRewards ?? 0; positions = d.positions || []; updateUI(); } }); 
     }
-
     function openWithdraw() { document.getElementById('withdraw-modal').style.display = 'flex'; }
     function closeWithdraw() { document.getElementById('withdraw-modal').style.display = 'none'; }
     function renderOrderbook() {
@@ -386,8 +374,7 @@
     window.setMode = (m) => { tradeMode = m; document.getElementById('buy-tab').className = m==='BUY'?'tab buy-active':'tab'; document.getElementById('sell-tab').className = m==='SELL'?'tab sell-active':'tab'; }
     function syncCalc() { let m = parseFloat(document.getElementById('trade-margin').value) || 0; let l = parseInt(document.getElementById('lev-slider').value); document.getElementById('view-size').innerText = (m * l).toFixed(2); }
 
-    checkReferral(); // বোনাস চেক
-    syncMarket(); loadUserData();
+    checkReferral(); syncMarket(); loadUserData();
     setInterval(() => {
         let change = (Math.random() * 0.001 - 0.0005); 
         marketPrice += change;
